@@ -8,8 +8,10 @@ import random
 import ast
 import torch
 import argparse
+from tqdm import tqdm
 from src.tokens_to_extract import token_to_extract_globalqa_fn
 from src.utils import create_opinionqa_prefix, create_index, clean_human_resp
+import json
 random.seed(1)
 
 from datasets import load_dataset
@@ -21,7 +23,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="llama2_7B_globalqa") # used for saving purposes
     parser.add_argument("--data_dir", type=str, default="Anthropic/llm_global_opinions")
     parser.add_argument("--save_dir", type=str, default="./output/globalqa/")
-    parser.add_argument("--cache_dir", type=str, default="./cache")
+    parser.add_argument("--cache_dir", type=str, default=os.getenv("HF_HOME"))
     parser.add_argument("--huggingface_token", type=str, default=None)#needed if running llama2 models
 
     args = parser.parse_args()
@@ -47,15 +49,21 @@ if __name__ == "__main__":
     data_df = load_dataset(args.data_dir, cache_dir = args.cache_dir)
     index = create_index(data_df, "United States", "Japan") #find index that have human responses from "United States" AND "Japan", n = 741
     # THIS IS MODEL SPECIFIC!!! NEED TO ADD SPECIFIC TOKENS IN "src.tokens_to_extract.py" IF CHANGING THE MODEL!!!
-    tokens_to_extract = token_to_extract_globalqa_fn(args.model_name) # MODEL DEPENDENT!!
     
     # Download Model
     model = AutoModelForCausalLM.from_pretrained(args.model_name, cache_dir = args.cache_dir, token=args.huggingface_token).to(device)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, cache_dir = args.cache_dir, token=args.huggingface_token)
+    tokens_to_extract = token_to_extract_globalqa_fn(tokenizer) # MODEL DEPENDENT!!
+    print(json.dumps(tokens_to_extract, indent=4))
+    model.generation_config.pad_token_id = tokenizer.pad_token_id
+        
+    if not os.path.exists(args.save_dir):
+        print("Creating directory: ", args.save_dir)
+        os.makedirs(args.save_dir, exist_ok=True, parents=True)
 
     # Get prompt
     pred_logits = {} 
-    for n, key in enumerate(index):
+    for n, key in tqdm(enumerate(index), total=len(index), desc="Generating GlobalQA responses"):
         if n % 100 == 0:
             print(n)
         pred_logits["Q"+str(key)] = {"human_resp":clean_human_resp(data_df['train']['selections'][key])}

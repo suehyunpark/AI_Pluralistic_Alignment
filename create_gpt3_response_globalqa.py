@@ -112,8 +112,8 @@ if __name__ == "__main__":
 
                 logits_ls.append(logits)
                 pred_logits["Q"+str(key)][token] = {"label":key,
-                                                        "question":data_df['train']['question'][key],
-                                                        "answer_chices":ast.literal_eval(data_df['train']['options'][key]),
-                                                        "logits": logits_ls, # [a, b, c, d,..] - list form
-                                                        "sum": sum(logits_ls) / len(logits_ls)}
+                                                    "question":data_df['train']['question'][key],
+                                                    "answer_chices":ast.literal_eval(data_df['train']['options'][key]),
+                                                    "logits": logits_ls, # [a, b, c, d,..] - list form
+                                                    "sum": sum(logits_ls) / len(logits_ls)}
         torch.save(pred_logits, args.save_dir + args.model)

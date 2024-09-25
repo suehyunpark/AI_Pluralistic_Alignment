@@ -7,9 +7,11 @@ import os
 import random
 import torch
 import argparse
+from tqdm import tqdm
 from src.tokens_to_extract import token_to_extract_mpi_fn
 from src.utils import create_mpi_prefix, create_mpi_prompt
 random.seed(1)
+import json
 
 
 
@@ -36,16 +38,22 @@ if __name__ == "__main__":
     # Download data
     os.environ['TRANSFORMERS_CACHE'] = args.cache_dir
     data_df = data_df = pd.read_csv(args.data_dir, delimiter="\t")
-    # THIS IS MODEL SPECIFIC!!! NEED TO ADD SPECIFIC TOKENS IN "src.tokens_to_extract.py" IF CHANGING THE MODEL!!!
-    tokens_to_extract = token_to_extract_mpi_fn(args.model_name) # MODEL DEPENDENT!!
     
     # Download Model 
     model = AutoModelForCausalLM.from_pretrained(args.model_name, cache_dir = args.cache_dir, token=args.huggingface_token).to(device)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, cache_dir = args.cache_dir, token=args.huggingface_token)
+    model.generation_config.pad_token_id = tokenizer.pad_token_id
+    # THIS IS MODEL SPECIFIC!!! NEED TO ADD SPECIFIC TOKENS IN "src.tokens_to_extract.py" IF CHANGING THE MODEL!!!
+    tokens_to_extract = token_to_extract_mpi_fn(tokenizer) # MODEL DEPENDENT!!
+    print(json.dumps(tokens_to_extract, indent=4))
+    
+    if not os.path.exists(args.save_dir):
+        print("Creating directory: ", args.save_dir)
+        os.makedirs(args.save_dir, exist_ok=True)
 
     # Get prompt
     pred_logits = {} 
-    for i,statement in enumerate(data_df['text']):
+    for i,statement in tqdm(enumerate(data_df['text']), total=len(data_df['text']), desc="Generating MPI responses"):
         print(i)
         pred_logits["Q"+str(i)] = {}
         for rep in range(5):
